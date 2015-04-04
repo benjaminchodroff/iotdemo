@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>CloudOneIOT</name>
+	<comment></comment>
+	<projects>
+		<project>lpmsp430f5529_25_core</project>
+		<project>lpmsp430f5529_25_WiFi</project>
+		<project>lpmsp430f5529_25_USBSerial</project>
+		<project>lpmsp430f5529_25_SPI</project>
+		<project>lpmsp430f5529_25_PubNub</project>
+		<project>lpmsp430f5529_25_aJson</project>
+		<project>lpmsp430f5529_25_DigitalTube</project>
+		<project>lpmsp430f5529_25_Humidity_Temperature_Sensor</project>
+		<project>lpmsp430f5529_25_ChainableLED</project>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.genmakebuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.ScannerConfigBuilder</name>
+			<triggers>full,incremental,</triggers>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>com.ti.ccstudio.energia.sketchNature</nature>
+		<nature>com.ti.ccstudio.core.ccsNature</nature>
+		<nature>org.eclipse.cdt.core.cnature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
+		<nature>org.eclipse.cdt.core.ccnature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
+	</natures>
+</projectDescription>
