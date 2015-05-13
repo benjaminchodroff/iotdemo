@@ -5,8 +5,6 @@
 	<deviceFamily value="MSP430"/>
 	<codegenToolVersion value="GNU_4.6.3:MSPGCC"/>
 	<isElfFormat value="true"/>
-	<rts value=""/>
 	<createSlaveProjects value=""/>
 	<ignoreDefaultDeviceSettings value="true"/>
-	<energia.primaryFile value="CloudOneIOT.ino"/>
 </projectOptions>

@@ -1,23 +1,28 @@
-#include <msp430.h>
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 #include <Energia.h>
+#include <aJSON.h>
+#include <ChainableLED.h>
+#include <DHT.h>
 #include <IPAddress.h>
 #include <math.h>
 #include <pins_energia.h>
+#include <PubNub.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <TimerSerial.h>
+#include <TM1637.h>
 #include <utility/wl_definitions.h>
+#include <WiFi.h>
 #include <WiFiClient.h>
 #include <WiFiServer.h>
-#include <SPI.h>
-#include <WiFi.h>
-#include <PubNub.h>
-#include <aJSON.h>
-#include <TM1637.h>
-#include <DHT.h>
-#include <ChainableLED.h>
+#include <Countdown.h>
+#include <MQTTClient.h>
+#include <MQTTConnect.h>
+#include <MQTTPacket.h>
+#include <stdio.h>
+#include <WifiIPStack.h>
+#include <WString.h>
 
 void tachCount();
 void setup();
@@ -39,10 +44,41 @@ void playNote(char note, int duration);
 void loop();
 
 bool debug = false;
-char version[] = "1.1.3";
+bool usePubNub = false;
+bool useMQTT = true;
+char version[] = "2.1.3";
 char boardtype[] = "MSP430F5529";
-char ssid[] = "cloudone";
-char password[] = "Diem71colts!";
+/*
+char ssid[] = "iscape2.4ghz";
+char password[] = "J7bJpvPJ8rJzM";
+*/
+char ssid[] = "chodroff";
+char password[] = "dummydummy";
+
+#define MQTT_MAX_PACKET_SIZE 200
+#define SIZE 200
+int mqttPort = 1883;
+char topic[] = "iot-2/evt/status/fmt/json";
+char subTopic[] = "iot-2/cmd/+/fmt/json";
+char organization[] = "5dj1dm";
+char typeId[] = "launchpad";
+char deviceId[] = "78a5040fad88";
+
+// Authentication method. Should be use-toke-auth
+// When using authenticated mode
+char authMethod[] = "use-token-auth";
+// The auth-token from the information above
+char authToken[] = "Fr1+(n*(JPegi)Ktci";
+// This string will be created in setup
+char clientId[48];
+// This string will be created in setup
+char registeredUrl[SIZE];
+
+// The function to call when a message arrives
+void callback(char* topic, byte* payload, unsigned int length);
+WifiIPStack ipstack;
+MQTT::Client<WifiIPStack, Countdown, MQTT_MAX_PACKET_SIZE> client(ipstack);
+void messageArrived(MQTT::MessageData& md);
 
 const unsigned long tachCheckDelay = 1000; // How often to check the tach
 int fanspeed = 255; // Start the fan at the slowest speed
@@ -178,8 +214,16 @@ void setup() {
 	server.begin();
 	Serial.println("Webserver started!");
 
-	PubNub.begin(pubkey, subkey);
-	Serial.println("PubNub set up");
+	if(usePubNub){
+		PubNub.begin(pubkey, subkey);
+		Serial.println("PubNub set up");
+	}
+
+	if(useMQTT){
+	// Create the mqtt url and the client id
+		sprintf(clientId, "d:%s:%s:%s", organization, typeId, deviceId);
+		sprintf(registeredUrl,"%s.messaging.internetofthings.ibmcloud.com",organization);
+	}
 	Serial.println("Initialization Complete!");
 }
 
@@ -371,6 +415,63 @@ void publishPubNub() {
 	}
 }
 
+void publishMQTT() {
+	int rc = -1;
+	if (!client.isConnected()) {
+		Serial.print("Connecting to: ");
+		Serial.print(registeredUrl);
+		Serial.print(" with client id: ");
+		Serial.println(clientId);
+		while (rc != 0) {
+		  rc = ipstack.connect(registeredUrl, mqttPort);
+		}
+
+		MQTTPacket_connectData options = MQTTPacket_connectData_initializer;
+		options.MQTTVersion = 3;
+		options.clientID.cstring = clientId;
+		options.username.cstring = authMethod;
+		options.password.cstring = authToken;
+		options.keepAliveInterval = 10;
+		rc = -1;
+		while ((rc = client.connect(options)) != 0)
+		  ;
+		Serial.println("Connected\n");
+
+		Serial.print("Subscribing to topic: ");
+		Serial.println(subTopic);
+		// Unsubscribe the topic, if it had subscribed it before.
+		client.unsubscribe(subTopic);
+		// Try to subscribe for commands
+		if ((rc = client.subscribe(subTopic, MQTT::QOS0, messageArrived)) != 0) {
+				Serial.print("Subscribe failed with return code : ");
+				Serial.println(rc);
+		} else {
+			  Serial.println("Subscribe success\n");
+		}
+	}
+
+	aJsonObject *msg = createMessage();
+	char *msgStr = aJson.print(msg);
+	aJson.deleteItem(msg);
+	if(debug) Serial.println(msgStr);
+
+	MQTT::Message message;
+	message.qos = MQTT::QOS0;
+	message.retained = false;
+	message.payload = msgStr;
+	message.payloadlen = strlen(msgStr);
+	rc = client.publish(topic, message);
+
+	if (rc != 0) {
+		Serial.print("Message publish failed with return code : ");
+		Serial.println(rc);
+	}
+	free(msgStr);
+	// Wait for one second before publishing again
+	// This will also service any incomming messages
+	//client.yield(5000);
+}
+
 void checkTach() {
 	long time = millis();
 	// Monitoring cannot occur while sending and receiving wifi, exclude this time
@@ -486,8 +587,71 @@ void loop() {
 	detachInterrupt(TACH);
 	startWifi = millis();
 	if(debug) webClient();
-	publishPubNub();
+	if(usePubNub){
+		publishPubNub();
+	}
+	if(useMQTT){
+		publishMQTT();
+	}
 	endWifi = millis();
 	attachInterrupt(TACH, tachCount, FALLING);
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.println("Message has arrived");
+
+  char * msg = (char *)malloc(length * sizeof(char));
+  int count = 0;
+  for(count = 0 ; count < length ; count++) {
+    msg[count] = payload[count];
+  }
+  msg[count] = '\0';
+  Serial.println(msg);
+
+  if(length > 0) {
+    //digitalWrite(ledPin, HIGH);
+    //delay(1000);
+    //digitalWrite(ledPin, LOW);
+  }
+
+  free(msg);
+}
+
+void messageArrived(MQTT::MessageData& md) {
+  Serial.print("Message Received\t");
+    MQTT::Message &message = md.message;
+    int topicLen = strlen(md.topicName.lenstring.data) + 1;
+//    char* topic = new char[topicLen];
+    char * topic = (char *)malloc(topicLen * sizeof(char));
+    topic = md.topicName.lenstring.data;
+    topic[topicLen] = '\0';
+
+    int payloadLen = message.payloadlen + 1;
+//    char* payload = new char[payloadLen];
+    char * payload = (char*)message.payload;
+    payload[payloadLen] = '\0';
+
+    String topicStr = topic;
+    String payloadStr = payload;
+
+    //Command topic: iot-2/cmd/blink/fmt/json
+
+    if(strstr(topic, "/cmd/blink") != NULL) {
+      Serial.print("Command IS Supported : ");
+      Serial.print(payload);
+      Serial.println("\t.....");
+
+      //pinMode(ledPin, OUTPUT);
+
+      //Blink twice
+      for(int i = 0 ; i < 2 ; i++ ) {
+        //digitalWrite(ledPin, HIGH);
+        //delay(250);
+        //digitalWrite(ledPin, LOW);
+        //delay(250);
+      }
+    } else {
+      Serial.println("Command Not Supported:");
+    }
 }
 

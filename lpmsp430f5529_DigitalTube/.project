@@ -1,17 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>CloudOneIOT</name>
+	<name>lpmsp430f5529_DigitalTube</name>
 	<comment></comment>
 	<projects>
-		<project>lpmsp430f5529_core</project>
-		<project>lpmsp430f5529_WiFi</project>
-		<project>lpmsp430f5529_SPI</project>
-		<project>lpmsp430f5529_PubNub</project>
-		<project>lpmsp430f5529_aJson</project>
-		<project>lpmsp430f5529_DigitalTube</project>
-		<project>lpmsp430f5529_Humidity_Temperature_Sensor</project>
-		<project>lpmsp430f5529_ChainableLED</project>
-		<project>lpmsp430f5529_MQTTClient</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
@@ -34,4 +25,11 @@
 		<nature>org.eclipse.cdt.core.ccnature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>TM1637.cpp</name>
+			<type>1</type>
+			<locationURI>ENERGIA_ROOT/hardware/msp430/libraries/DigitalTube/TM1637.cpp</locationURI>
+		</link>
+	</linkedResources>
 </projectDescription>
